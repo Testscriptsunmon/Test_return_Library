@@ -8,8 +8,8 @@ local Library = {}
 function Library:CreateWindow(config)
     config = config or {}
     
-    local brandPrefix = "Venxinmo | "
-    local customTitle = config.Title or "Dynamic Menu"
+    local brandPrefix = "VENXINMO | "
+    local customTitle = config.Title and string.upper(config.Title) or "DYNAMIC MENU"
     local titleText = brandPrefix .. customTitle
 
     local enableLoading = config.Loading or false
@@ -32,7 +32,7 @@ function Library:CreateWindow(config)
             end
         end)
         topbar.InputChanged:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
         end)
         UserInputService.InputChanged:Connect(function(input)
             if input == dragInput and dragging then
@@ -87,7 +87,7 @@ function Library:CreateWindow(config)
         local LoadingText = Instance.new("TextLabel", LoadingFrame)
         LoadingText.Size = UDim2.new(1, 0, 1, 0)
         LoadingText.BackgroundTransparency = 1
-        LoadingText.Text = "Menu loading..."
+        LoadingText.Text = "MENU LOADING..."
         LoadingText.TextColor3 = Color3.fromRGB(255, 255, 255)
         LoadingText.TextSize = 14
         LoadingText.Font = Enum.Font.GothamBold
@@ -132,18 +132,14 @@ function Library:CreateWindow(config)
     CloseMenuButton.ZIndex = 2
     Instance.new("UICorner", CloseMenuButton).CornerRadius = UDim.new(0, 5)
 
-    -- ID Mũi tên chỉ lên và chỉ xuống
-    local ArrowUpId = "rbxassetid://6031091006"
-    local ArrowDownId = "rbxassetid://6031091002"
-
-    -- Nút Toggle thu gọn bằng ImageButton Mũi tên
     local ToggleMenuButton = Instance.new("ImageButton", TopBar)
     ToggleMenuButton.Size = UDim2.new(0, 22, 0, 22)
     ToggleMenuButton.Position = UDim2.new(1, -68, 0, 8)
     ToggleMenuButton.BackgroundTransparency = 1
-    ToggleMenuButton.Image = ArrowUpId
+    ToggleMenuButton.Image = "rbxassetid://6031280883"
     ToggleMenuButton.ImageColor3 = Color3.fromRGB(200, 200, 200)
     ToggleMenuButton.ZIndex = 2
+    ToggleMenuButton.Rotation = 0
 
     local ContainerHolder = Instance.new("Frame", MainFrame)
     ContainerHolder.Size = UDim2.new(1, 0, 1, -38)
@@ -166,10 +162,10 @@ function Library:CreateWindow(config)
         
         if menuVisible then
             ContainerHolder.Visible = true
-            ToggleMenuButton.Image = ArrowUpId
+            TweenService:Create(ToggleMenuButton, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 0}):Play()
             TweenService:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, 500, 0, 350)}):Play()
         else
-            ToggleMenuButton.Image = ArrowDownId
+            TweenService:Create(ToggleMenuButton, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Rotation = 90}):Play()
             TweenService:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(0, collapsedWidth, 0, 38)}):Play()
             task.wait(0.25)
             if not menuVisible then
