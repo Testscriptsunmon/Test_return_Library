@@ -1,0 +1,1480 @@
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+
+local CompactUI = {}
+
+local ICONS = {
+	Home = "rbxassetid://6031075938",
+	Settings = "rbxassetid://6031280883",
+	Search = "rbxassetid://6031154871",
+	Shield = "rbxassetid://6031082533",
+	Server = "rbxassetid://6031086212",
+	Users = "rbxassetid://6031265976",
+	Chart = "rbxassetid://6031091004",
+	Bolt = "rbxassetid://6031225816",
+	Info = "rbxassetid://6031280883",
+	Close = "rbxassetid://6031094678",
+	Menu = "rbxassetid://6031280883",
+	Chevron = "rbxassetid://6031090990"
+}
+
+local THEMES = {
+	Noir = {
+		Window = Color3.fromRGB(14, 16, 21),
+		Header = Color3.fromRGB(20, 23, 30),
+		Panel = Color3.fromRGB(24, 28, 37),
+		Card = Color3.fromRGB(29, 34, 44),
+		Hover = Color3.fromRGB(39, 46, 59),
+		Stroke = Color3.fromRGB(57, 66, 84),
+		Text = Color3.fromRGB(242, 245, 252),
+		Muted = Color3.fromRGB(145, 155, 174),
+		Accent = Color3.fromRGB(93, 145, 255),
+		AccentDark = Color3.fromRGB(38, 69, 133),
+		Success = Color3.fromRGB(73, 220, 153),
+		Danger = Color3.fromRGB(239, 87, 103)
+	},
+	Purple = {
+		Window = Color3.fromRGB(20, 15, 28),
+		Header = Color3.fromRGB(29, 21, 40),
+		Panel = Color3.fromRGB(37, 26, 50),
+		Card = Color3.fromRGB(47, 32, 63),
+		Hover = Color3.fromRGB(63, 43, 83),
+		Stroke = Color3.fromRGB(83, 57, 108),
+		Text = Color3.fromRGB(249, 241, 255),
+		Muted = Color3.fromRGB(187, 162, 205),
+		Accent = Color3.fromRGB(184, 112, 255),
+		AccentDark = Color3.fromRGB(93, 44, 142),
+		Success = Color3.fromRGB(83, 223, 167),
+		Danger = Color3.fromRGB(242, 95, 121)
+	},
+	Ocean = {
+		Window = Color3.fromRGB(10, 22, 34),
+		Header = Color3.fromRGB(14, 31, 48),
+		Panel = Color3.fromRGB(18, 41, 62),
+		Card = Color3.fromRGB(22, 51, 75),
+		Hover = Color3.fromRGB(30, 68, 96),
+		Stroke = Color3.fromRGB(42, 91, 122),
+		Text = Color3.fromRGB(232, 248, 255),
+		Muted = Color3.fromRGB(145, 190, 213),
+		Accent = Color3.fromRGB(56, 177, 255),
+		AccentDark = Color3.fromRGB(25, 91, 143),
+		Success = Color3.fromRGB(70, 222, 174),
+		Danger = Color3.fromRGB(241, 94, 112)
+	},
+	Light = {
+		Window = Color3.fromRGB(235, 240, 248),
+		Header = Color3.fromRGB(249, 251, 255),
+		Panel = Color3.fromRGB(224, 231, 242),
+		Card = Color3.fromRGB(213, 222, 236),
+		Hover = Color3.fromRGB(198, 211, 230),
+		Stroke = Color3.fromRGB(176, 191, 214),
+		Text = Color3.fromRGB(26, 34, 48),
+		Muted = Color3.fromRGB(85, 103, 129),
+		Accent = Color3.fromRGB(44, 117, 224),
+		AccentDark = Color3.fromRGB(179, 207, 247),
+		Success = Color3.fromRGB(34, 166, 108),
+		Danger = Color3.fromRGB(207, 61, 78)
+	}
+}
+
+local function play(object, properties, duration, style, direction)
+	if object and object.Parent then
+		TweenService:Create(
+			object,
+			TweenInfo.new(
+				duration or 0.2,
+				style or Enum.EasingStyle.Quart,
+				direction or Enum.EasingDirection.Out
+			),
+			properties
+		):Play()
+	end
+end
+
+local function makeCorner(parent, radius)
+	local item = Instance.new("UICorner")
+	item.CornerRadius = UDim.new(0, radius or 8)
+	item.Parent = parent
+	return item
+end
+
+local function makeStroke(parent, color, thickness)
+	local item = Instance.new("UIStroke")
+	item.Color = color
+	item.Thickness = thickness or 1
+	item.Transparency = 0.1
+	item.Parent = parent
+	return item
+end
+
+local function makeLabel(parent, value, size, color, font)
+	local item = Instance.new("TextLabel")
+	item.BackgroundTransparency = 1
+	item.Text = value or ""
+	item.TextSize = size or 12
+	item.TextColor3 = color
+	item.Font = font or Enum.Font.Gotham
+	item.TextXAlignment = Enum.TextXAlignment.Left
+	item.Parent = parent
+	return item
+end
+
+local function resolveIcon(icon)
+	if typeof(icon) == "number" then
+		return "rbxassetid://" .. tostring(icon)
+	end
+
+	if typeof(icon) == "string" then
+		if string.find(icon, "rbxassetid://") then
+			return icon
+		end
+
+		return ICONS[icon] or icon
+	end
+
+	return ICONS.Info
+end
+
+local function addHover(button, normal, hover)
+	button.MouseEnter:Connect(function()
+		play(button, {BackgroundColor3 = hover}, 0.15)
+	end)
+
+	button.MouseLeave:Connect(function()
+		play(button, {BackgroundColor3 = normal}, 0.15)
+	end)
+end
+
+local function draggable(handle, target)
+	local active = false
+	local inputStart
+	local positionStart
+
+	handle.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+
+			active = true
+			inputStart = input.Position
+			positionStart = target.Position
+
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					active = false
+				end
+			end)
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if not active then
+			return
+		end
+
+		if input.UserInputType ~= Enum.UserInputType.MouseMovement
+			and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+
+		local delta = input.Position - inputStart
+
+		target.Position = UDim2.new(
+			positionStart.X.Scale,
+			positionStart.X.Offset + delta.X,
+			positionStart.Y.Scale,
+			positionStart.Y.Offset + delta.Y
+		)
+	end)
+end
+
+function CompactUI.Create(config)
+	config = config or {}
+
+	local player = Players.LocalPlayer
+	local parent = config.Parent
+		or (player and player:WaitForChild("PlayerGui"))
+		or game:GetService("CoreGui")
+
+	local themeName = THEMES[config.Theme] and config.Theme or "Noir"
+	local theme = THEMES[themeName]
+
+	local windowWidth = config.Width or 520
+	local windowHeight = config.Height or 330
+	local mobileBreakpoint = config.MobileBreakpoint or 500
+
+	local gui = Instance.new("ScreenGui")
+	gui.Name = config.Name or "CompactUI"
+	gui.IgnoreGuiInset = true
+	gui.ResetOnSpawn = false
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.Parent = parent
+
+	local dock = Instance.new("TextButton")
+	dock.Name = "OpenDock"
+	dock.AnchorPoint = Vector2.new(0.5, 1)
+	dock.Position = UDim2.new(0.5, 0, 1, -18)
+	dock.Size = UDim2.fromOffset(178, 38)
+	dock.BackgroundColor3 = theme.Header
+	dock.Text = ""
+	dock.Visible = false
+	dock.AutoButtonColor = false
+	dock.Parent = gui
+
+	makeCorner(dock, 13)
+	makeStroke(dock, theme.Stroke, 1)
+
+	local dockDot = Instance.new("Frame")
+	dockDot.Size = UDim2.fromOffset(8, 8)
+	dockDot.Position = UDim2.new(0, 14, 0.5, -4)
+	dockDot.BackgroundColor3 = theme.Success
+	dockDot.Parent = dock
+
+	makeCorner(dockDot, 8)
+
+	local dockText = makeLabel(
+		dock,
+		config.DockText or "OPEN MENU",
+		11,
+		theme.Text,
+		Enum.Font.GothamBold
+	)
+
+	dockText.Size = UDim2.new(1, -48, 1, 0)
+	dockText.Position = UDim2.fromOffset(32, 0)
+
+	local dockIcon = Instance.new("ImageLabel")
+	dockIcon.BackgroundTransparency = 1
+	dockIcon.Size = UDim2.fromOffset(17, 17)
+	dockIcon.Position = UDim2.new(1, -29, 0.5, -8)
+	dockIcon.Image = resolveIcon(config.DockIcon or "Chevron")
+	dockIcon.ImageColor3 = theme.Muted
+	dockIcon.Parent = dock
+
+	local window = Instance.new("Frame")
+	window.Name = "Window"
+	window.AnchorPoint = Vector2.new(0.5, 0.5)
+	window.Position = UDim2.fromScale(0.5, 0.5)
+	window.Size = UDim2.fromOffset(windowWidth, windowHeight)
+	window.BackgroundColor3 = theme.Window
+	window.Parent = gui
+
+	makeCorner(window, 12)
+
+	local windowStroke = makeStroke(window, theme.Stroke, 1)
+
+	local header = Instance.new("Frame")
+	header.Name = "Header"
+	header.Size = UDim2.new(1, 0, 0, 48)
+	header.BackgroundColor3 = theme.Header
+	header.Parent = window
+
+	makeCorner(header, 12)
+	draggable(header, window)
+
+	local dragDots = {}
+
+	for index = 1, 3 do
+		local dot = Instance.new("Frame")
+		dot.Size = UDim2.fromOffset(5, 5)
+		dot.Position = UDim2.fromOffset(13 + ((index - 1) * 8), 22)
+		dot.BackgroundColor3 = index == 1 and theme.Accent or theme.Muted
+		dot.Parent = header
+
+		makeCorner(dot, 5)
+		table.insert(dragDots, dot)
+	end
+
+	local title = makeLabel(
+		header,
+		string.upper(config.Title or "COMPACT MENU"),
+		12,
+		theme.Text,
+		Enum.Font.GothamBold
+	)
+
+	title.Position = UDim2.fromOffset(43, 7)
+	title.Size = UDim2.new(1, -130, 0, 17)
+
+	local subtitle = makeLabel(
+		header,
+		config.Subtitle or "Advanced interface",
+		9,
+		theme.Muted,
+		Enum.Font.Gotham
+	)
+
+	subtitle.Position = UDim2.fromOffset(43, 25)
+	subtitle.Size = UDim2.new(1, -130, 0, 13)
+
+	local minimize = Instance.new("ImageButton")
+	minimize.Name = "HideButton"
+	minimize.Size = UDim2.fromOffset(26, 26)
+	minimize.Position = UDim2.new(1, -67, 0.5, -13)
+	minimize.BackgroundColor3 = theme.Panel
+	minimize.Image = resolveIcon(config.HideIcon or "Chevron")
+	minimize.ImageColor3 = theme.Muted
+	minimize.Parent = header
+
+	makeCorner(minimize, 8)
+	addHover(minimize, theme.Panel, theme.Hover)
+
+	local close = Instance.new("ImageButton")
+	close.Name = "CloseButton"
+	close.Size = UDim2.fromOffset(26, 26)
+	close.Position = UDim2.new(1, -35, 0.5, -13)
+	close.BackgroundColor3 = theme.Panel
+	close.Image = resolveIcon(config.CloseIcon or "Close")
+	close.ImageColor3 = theme.Muted
+	close.Parent = header
+
+	makeCorner(close, 8)
+	addHover(close, theme.Panel, theme.Hover)
+
+	local body = Instance.new("Frame")
+	body.Name = "Body"
+	body.Position = UDim2.fromOffset(0, 48)
+	body.Size = UDim2.new(1, 0, 1, -48)
+	body.BackgroundTransparency = 1
+	body.Parent = window
+
+	local navigation = Instance.new("ScrollingFrame")
+	navigation.Name = "Navigation"
+	navigation.Position = UDim2.fromOffset(9, 9)
+	navigation.Size = UDim2.new(0, 126, 1, -18)
+	navigation.BackgroundColor3 = theme.Panel
+	navigation.BorderSizePixel = 0
+	navigation.ScrollBarThickness = 2
+	navigation.CanvasSize = UDim2.new()
+	navigation.Parent = body
+
+	makeCorner(navigation, 9)
+	makeStroke(navigation, theme.Stroke, 1)
+
+	local navPadding = Instance.new("UIPadding")
+	navPadding.PaddingTop = UDim.new(0, 8)
+	navPadding.PaddingLeft = UDim.new(0, 7)
+	navPadding.PaddingRight = UDim.new(0, 7)
+	navPadding.PaddingBottom = UDim.new(0, 8)
+	navPadding.Parent = navigation
+
+	local navLayout = Instance.new("UIListLayout")
+	navLayout.Padding = UDim.new(0, 5)
+	navLayout.Parent = navigation
+
+	local content = Instance.new("Frame")
+	content.Name = "Content"
+	content.Position = UDim2.new(0, 144, 0, 9)
+	content.Size = UDim2.new(1, -153, 1, -18)
+	content.BackgroundColor3 = theme.Panel
+	content.Parent = body
+
+	makeCorner(content, 9)
+	makeStroke(content, theme.Stroke, 1)
+
+	local pages = {}
+	local tabs = {}
+	local activeTab
+	local hidden = false
+	local destroyed = false
+	local mobile = false
+
+	local function updateTheme()
+		window.BackgroundColor3 = theme.Window
+		windowStroke.Color = theme.Stroke
+		header.BackgroundColor3 = theme.Header
+		navigation.BackgroundColor3 = theme.Panel
+		content.BackgroundColor3 = theme.Panel
+		dock.BackgroundColor3 = theme.Header
+		dockText.TextColor3 = theme.Text
+		dockIcon.ImageColor3 = theme.Muted
+		dockDot.BackgroundColor3 = theme.Success
+
+		for _, item in ipairs(gui:GetDescendants()) do
+			local role = item:GetAttribute("CompactRole")
+
+			if role == "Text" and item:IsA("TextLabel") then
+				item.TextColor3 = theme.Text
+			elseif role == "Muted" and item:IsA("TextLabel") then
+				item.TextColor3 = theme.Muted
+			elseif role == "Accent" and item:IsA("TextLabel") then
+				item.TextColor3 = theme.Accent
+			end
+		end
+	end
+
+	local function setTab(name, direction)
+		local oldPage = activeTab and pages[activeTab]
+		local newPage = pages[name]
+
+		if not newPage then
+			return
+		end
+
+		if oldPage and oldPage ~= newPage then
+			oldPage.Visible = false
+		end
+
+		newPage.Visible = true
+		newPage.Position = UDim2.new(
+			direction == "left" and -0.08 or 0.08,
+			0,
+			0,
+			0
+		)
+		newPage.BackgroundTransparency = 1
+
+		play(
+			newPage,
+			{
+				Position = UDim2.new(0, 0, 0, 0),
+				BackgroundTransparency = 0
+			},
+			0.23
+		)
+
+		for tabName, data in pairs(tabs) do
+			local selected = tabName == name
+
+			play(
+				data.Button,
+				{
+					BackgroundColor3 = selected and theme.AccentDark or theme.Panel,
+					BackgroundTransparency = selected and 0 or 1
+				},
+				0.18
+			)
+
+			play(
+				data.Icon,
+				{
+					ImageColor3 = selected and theme.Text or theme.Muted
+				},
+				0.18
+			)
+
+			play(
+				data.Label,
+				{
+					TextColor3 = selected and theme.Text or theme.Muted
+				},
+				0.18
+			)
+
+			play(
+				data.Dot,
+				{
+					BackgroundColor3 = selected and theme.Accent or theme.Muted,
+					Size = selected
+						and UDim2.fromOffset(6, 6)
+						or UDim2.fromOffset(4, 4)
+				},
+				0.18
+			)
+		end
+
+		activeTab = name
+	end
+
+	local function updateResponsive()
+		mobile = window.AbsoluteSize.X < mobileBreakpoint
+
+		if mobile then
+			navigation.Position = UDim2.fromOffset(7, 7)
+			navigation.Size = UDim2.new(0, 48, 1, -14)
+
+			content.Position = UDim2.new(0, 62, 0, 7)
+			content.Size = UDim2.new(1, -69, 1, -14)
+
+			for _, item in pairs(tabs) do
+				item.Label.Visible = false
+				item.Button.Size = UDim2.new(1, 0, 0, 34)
+				item.Icon.Position = UDim2.new(0.5, -9, 0.5, -9)
+				item.Dot.Position = UDim2.new(1, -8, 0, 5)
+			end
+		else
+			navigation.Position = UDim2.fromOffset(9, 9)
+			navigation.Size = UDim2.new(0, 126, 1, -18)
+
+			content.Position = UDim2.new(0, 144, 0, 9)
+			content.Size = UDim2.new(1, -153, 1, -18)
+
+			for _, item in pairs(tabs) do
+				item.Label.Visible = true
+				item.Button.Size = UDim2.new(1, 0, 0, 36)
+				item.Icon.Position = UDim2.fromOffset(10, 9)
+				item.Dot.Position = UDim2.new(1, -10, 0.5, -3)
+			end
+		end
+	end
+
+	window:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateResponsive)
+
+	local api = {}
+
+	function api:CreateTab(name, icon)
+		if type(name) ~= "string" or name == "" then
+			error("Tab name is required")
+		end
+
+		local page = Instance.new("ScrollingFrame")
+		page.Name = name .. "Page"
+		page.Position = UDim2.fromOffset(10, 10)
+		page.Size = UDim2.new(1, -20, 1, -20)
+		page.BackgroundTransparency = 1
+		page.BorderSizePixel = 0
+		page.ScrollBarThickness = 3
+		page.Visible = false
+		page.Parent = content
+
+		local pageLayout = Instance.new("UIListLayout")
+		pageLayout.Padding = UDim.new(0, 7)
+		pageLayout.Parent = page
+
+		local pagePadding = Instance.new("UIPadding")
+		pagePadding.PaddingBottom = UDim.new(0, 10)
+		pagePadding.Parent = page
+
+		pageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+			page.CanvasSize = UDim2.fromOffset(
+				0,
+				pageLayout.AbsoluteContentSize.Y + 15
+			)
+		end)
+
+		local navButton = Instance.new("TextButton")
+		navButton.Name = name .. "Button"
+		navButton.Size = UDim2.new(1, 0, 0, 36)
+		navButton.BackgroundColor3 = theme.Panel
+		navButton.BackgroundTransparency = 1
+		navButton.Text = ""
+		navButton.AutoButtonColor = false
+		navButton.Parent = navigation
+
+		makeCorner(navButton, 8)
+
+		local navIcon = Instance.new("ImageLabel")
+		navIcon.BackgroundTransparency = 1
+		navIcon.Size = UDim2.fromOffset(18, 18)
+		navIcon.Position = UDim2.fromOffset(10, 9)
+		navIcon.Image = resolveIcon(icon or "Info")
+		navIcon.ImageColor3 = theme.Muted
+		navIcon.Parent = navButton
+
+		local navLabel = makeLabel(
+			navButton,
+			name,
+			10,
+			theme.Muted,
+			Enum.Font.GothamMedium
+		)
+
+		navLabel.Position = UDim2.fromOffset(34, 0)
+		navLabel.Size = UDim2.new(1, -45, 1, 0)
+
+		local navDot = Instance.new("Frame")
+		navDot.Size = UDim2.fromOffset(4, 4)
+		navDot.Position = UDim2.new(1, -10, 0.5, -2)
+		navDot.BackgroundColor3 = theme.Muted
+		navDot.Parent = navButton
+
+		makeCorner(navDot, 4)
+
+		tabs[name] = {
+			Button = navButton,
+			Icon = navIcon,
+			Label = navLabel,
+			Dot = navDot
+		}
+
+		pages[name] = page
+
+		navButton.MouseEnter:Connect(function()
+			if activeTab ~= name then
+				play(
+					navButton,
+					{BackgroundColor3 = theme.Hover},
+					0.15
+				)
+			end
+		end)
+
+		navButton.MouseLeave:Connect(function()
+			if activeTab ~= name then
+				play(
+					navButton,
+					{BackgroundColor3 = theme.Panel},
+					0.15
+				)
+			end
+		end)
+
+		navButton.MouseButton1Click:Connect(function()
+			local oldIndex = 0
+			local newIndex = 0
+			local index = 0
+
+			for tabName in pairs(tabs) do
+				index += 1
+
+				if tabName == activeTab then
+					oldIndex = index
+				end
+
+				if tabName == name then
+					newIndex = index
+				end
+			end
+
+			setTab(
+				name,
+				newIndex >= oldIndex and "right" or "left"
+			)
+		end)
+
+		if not activeTab then
+			setTab(name, "right")
+		end
+
+		local tab = {}
+
+		local function makeCard(height)
+			local card = Instance.new("Frame")
+			card.Size = UDim2.new(1, 0, 0, height or 40)
+			card.BackgroundColor3 = theme.Card
+			card.Parent = page
+
+			makeCorner(card, 8)
+
+			return card
+		end
+
+		local function cardText(parent, value, colorName)
+			local item = makeLabel(
+				parent,
+				value,
+				11,
+				theme[colorName or "Text"],
+				Enum.Font.Gotham
+			)
+
+			item:SetAttribute(
+				"CompactRole",
+				colorName or "Text"
+			)
+
+			return item
+		end
+
+		function tab:AddLabel(value)
+			local card = makeCard(32)
+			local text = cardText(card, value, "Muted")
+
+			text.Position = UDim2.fromOffset(10, 0)
+			text.Size = UDim2.new(1, -20, 1, 0)
+
+			return card
+		end
+
+		function tab:AddButton(value, callback)
+			local button = Instance.new("TextButton")
+			button.Size = UDim2.new(1, 0, 0, 40)
+			button.BackgroundColor3 = theme.Accent
+			button.Text = ""
+			button.AutoButtonColor = false
+			button.Parent = page
+
+			makeCorner(button, 8)
+
+			local dot = Instance.new("Frame")
+			dot.Size = UDim2.fromOffset(7, 7)
+			dot.Position = UDim2.new(0, 13, 0.5, -3)
+			dot.BackgroundColor3 = theme.Text
+			dot.Parent = button
+
+			makeCorner(dot, 7)
+
+			local buttonText = makeLabel(
+				button,
+				value,
+				11,
+				theme.Text,
+				Enum.Font.GothamBold
+			)
+
+			buttonText.TextXAlignment = Enum.TextXAlignment.Center
+			buttonText.Size = UDim2.new(1, -35, 1, 0)
+			buttonText.Position = UDim2.fromOffset(25, 0)
+
+			button.MouseEnter:Connect(function()
+				play(
+					button,
+					{BackgroundColor3 = theme.AccentDark},
+					0.15
+				)
+
+				play(
+					dot,
+					{Size = UDim2.fromOffset(10, 10)},
+					0.15
+				)
+			end)
+
+			button.MouseLeave:Connect(function()
+				play(
+					button,
+					{BackgroundColor3 = theme.Accent},
+					0.15
+				)
+
+				play(
+					dot,
+					{Size = UDim2.fromOffset(7, 7)},
+					0.15
+				)
+			end)
+
+			button.MouseButton1Click:Connect(function()
+				if callback then
+					callback()
+				end
+			end)
+
+			return button
+		end
+
+		function tab:AddToggle(value, default, callback)
+			if type(default) == "function" then
+				callback = default
+				default = false
+			end
+
+			local card = makeCard(42)
+
+			local text = cardText(card, value, "Text")
+			text.Position = UDim2.fromOffset(11, 0)
+			text.Size = UDim2.new(1, -75, 1, 0)
+
+			local toggle = Instance.new("TextButton")
+			toggle.Size = UDim2.fromOffset(40, 21)
+			toggle.Position = UDim2.new(1, -51, 0.5, -10)
+			toggle.BackgroundColor3 = theme.Panel
+			toggle.Text = ""
+			toggle.AutoButtonColor = false
+			toggle.Parent = card
+
+			makeCorner(toggle, 11)
+
+			local knob = Instance.new("Frame")
+			knob.Size = UDim2.fromOffset(15, 15)
+			knob.Position = UDim2.new(0, 3, 0.5, -7)
+			knob.BackgroundColor3 = theme.Muted
+			knob.Parent = toggle
+
+			makeCorner(knob, 15)
+
+			local state = default == true
+
+			local function render(fire)
+				play(
+					toggle,
+					{
+						BackgroundColor3 = state
+							and theme.AccentDark
+							or theme.Panel
+					},
+					0.15
+				)
+
+				play(
+					knob,
+					{
+						Position = state
+							and UDim2.new(1, -18, 0.5, -7)
+							or UDim2.new(0, 3, 0.5, -7),
+						BackgroundColor3 = state
+							and theme.Accent
+							or theme.Muted
+					},
+					0.15
+				)
+
+				if fire and callback then
+					callback(state)
+				end
+			end
+
+			toggle.MouseButton1Click:Connect(function()
+				state = not state
+				render(true)
+			end)
+
+			render(false)
+
+			return {
+				Frame = card,
+				Get = function()
+					return state
+				end,
+				Set = function(_, valueToSet)
+					state = valueToSet == true
+					render(false)
+				end
+			}
+		end
+
+		function tab:AddInput(value, placeholder, callback)
+			local card = makeCard(42)
+
+			local text = cardText(card, value, "Text")
+			text.Position = UDim2.fromOffset(11, 0)
+			text.Size = UDim2.new(0.4, -5, 1, 0)
+
+			local input = Instance.new("TextBox")
+			input.Size = UDim2.new(0.54, 0, 0, 26)
+			input.Position = UDim2.new(0.44, 0, 0.5, -13)
+			input.BackgroundColor3 = theme.Panel
+			input.TextColor3 = theme.Text
+			input.PlaceholderColor3 = theme.Muted
+			input.PlaceholderText = placeholder or "Type here"
+			input.Text = ""
+			input.TextSize = 10
+			input.Font = Enum.Font.Gotham
+			input.ClearTextOnFocus = false
+			input.Parent = card
+
+			makeCorner(input, 6)
+
+			input.FocusLost:Connect(function(enterPressed)
+				if callback then
+					callback(input.Text, enterPressed)
+				end
+			end)
+
+			return input
+		end
+
+		function tab:AddSlider(value, min, max, default, callback)
+			min = min or 0
+			max = max or 100
+			default = default == nil and min or default
+
+			if max <= min then
+				max = min + 1
+			end
+
+			local card = makeCard(58)
+
+			local text = cardText(card, value, "Text")
+			text.Position = UDim2.fromOffset(11, 6)
+			text.Size = UDim2.new(0.7, 0, 0, 16)
+
+			local valueText = cardText(
+				card,
+				tostring(default),
+				"Accent"
+			)
+
+			valueText.TextXAlignment = Enum.TextXAlignment.Right
+			valueText.Position = UDim2.new(1, -61, 0, 6)
+			valueText.Size = UDim2.fromOffset(50, 16)
+
+			local bar = Instance.new("Frame")
+			bar.Size = UDim2.new(1, -22, 0, 5)
+			bar.Position = UDim2.fromOffset(11, 39)
+			bar.BackgroundColor3 = theme.Panel
+			bar.Parent = card
+
+			makeCorner(bar, 5)
+
+			local fill = Instance.new("Frame")
+			fill.Size = UDim2.new(0, 0, 1, 0)
+			fill.BackgroundColor3 = theme.Accent
+			fill.Parent = bar
+
+			makeCorner(fill, 5)
+
+			local knob = Instance.new("TextButton")
+			knob.Size = UDim2.fromOffset(24, 24)
+			knob.Position = UDim2.new(0, -12, 0.5, -12)
+			knob.BackgroundColor3 = theme.Accent
+			knob.Text = ""
+			knob.AutoButtonColor = false
+			knob.Parent = bar
+
+			makeCorner(knob, 20)
+			makeStroke(knob, theme.Text, 1)
+
+			local dragging = false
+
+			local function updateSlider(x, fire)
+				local percent = math.clamp(
+					(x - bar.AbsolutePosition.X) / bar.AbsoluteSize.X,
+					0,
+					1
+				)
+
+				local result = math.floor(
+					min + ((max - min) * percent) + 0.5
+				)
+
+				fill.Size = UDim2.new(percent, 0, 1, 0)
+				knob.Position = UDim2.new(
+					percent,
+					-12,
+					0.5,
+					-12
+				)
+
+				valueText.Text = tostring(result)
+
+				if fire and callback then
+					callback(result)
+				end
+			end
+
+			knob.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1
+					or input.UserInputType == Enum.UserInputType.Touch then
+
+					dragging = true
+					updateSlider(input.Position.X, true)
+				end
+			end)
+
+			bar.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1
+					or input.UserInputType == Enum.UserInputType.Touch then
+
+					dragging = true
+					updateSlider(input.Position.X, true)
+				end
+			end)
+
+			UserInputService.InputChanged:Connect(function(input)
+				if dragging
+					and (
+						input.UserInputType == Enum.UserInputType.MouseMovement
+						or input.UserInputType == Enum.UserInputType.Touch
+					) then
+
+					updateSlider(input.Position.X, true)
+				end
+			end)
+
+			UserInputService.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1
+					or input.UserInputType == Enum.UserInputType.Touch then
+
+					dragging = false
+				end
+			end)
+
+			task.defer(function()
+				local percent = math.clamp(
+					(default - min) / (max - min),
+					0,
+					1
+				)
+
+				updateSlider(
+					bar.AbsolutePosition.X
+						+ bar.AbsoluteSize.X * percent,
+					false
+				)
+			end)
+
+			return card
+		end
+
+		function tab:AddDropdown(value, options, callback)
+			local card = makeCard(40)
+
+			local button = Instance.new("TextButton")
+			button.Size = UDim2.new(1, -14, 0, 27)
+			button.Position = UDim2.fromOffset(7, 6)
+			button.BackgroundColor3 = theme.Panel
+			button.Text = ""
+			button.AutoButtonColor = false
+			button.Parent = card
+
+			makeCorner(button, 6)
+
+			local buttonText = makeLabel(
+				button,
+				value .. "  •  Select",
+				10,
+				theme.Text,
+				Enum.Font.Gotham
+			)
+
+			buttonText.Position = UDim2.fromOffset(9, 0)
+			buttonText.Size = UDim2.new(1, -35, 1, 0)
+
+			local arrow = Instance.new("ImageLabel")
+			arrow.BackgroundTransparency = 1
+			arrow.Size = UDim2.fromOffset(13, 13)
+			arrow.Position = UDim2.new(1, -22, 0.5, -6)
+			arrow.Image = resolveIcon("Chevron")
+			arrow.ImageColor3 = theme.Muted
+			arrow.Parent = button
+
+			local list = Instance.new("ScrollingFrame")
+			list.Position = UDim2.new(0, 0, 1, 4)
+			list.Size = UDim2.new(1, 0, 0, 0)
+			list.BackgroundColor3 = theme.Panel
+			list.BorderSizePixel = 0
+			list.ScrollBarThickness = 2
+			list.Visible = false
+			list.ClipsDescendants = true
+			list.ZIndex = 20
+			list.Parent = card
+
+			makeCorner(list, 7)
+
+			local listLayout = Instance.new("UIListLayout")
+			listLayout.Padding = UDim.new(0, 3)
+			listLayout.Parent = list
+
+			local open = false
+
+			for _, option in ipairs(options or {}) do
+				local optionButton = Instance.new("TextButton")
+				optionButton.Size = UDim2.new(1, -8, 0, 25)
+				optionButton.BackgroundColor3 = theme.Card
+				optionButton.Text = tostring(option)
+				optionButton.TextColor3 = theme.Text
+				optionButton.TextSize = 10
+				optionButton.Font = Enum.Font.Gotham
+				optionButton.AutoButtonColor = false
+				optionButton.ZIndex = 21
+				optionButton.Parent = list
+
+				makeCorner(optionButton, 5)
+
+				optionButton.MouseEnter:Connect(function()
+					play(
+						optionButton,
+						{BackgroundColor3 = theme.Hover},
+						0.12
+					)
+				end)
+
+				optionButton.MouseLeave:Connect(function()
+					play(
+						optionButton,
+						{BackgroundColor3 = theme.Card},
+						0.12
+					)
+				end)
+
+				optionButton.MouseButton1Click:Connect(function()
+					buttonText.Text = value .. "  •  " .. tostring(option)
+					open = false
+
+					play(
+						arrow,
+						{Rotation = 0},
+						0.16
+					)
+
+					play(
+						list,
+						{Size = UDim2.new(1, 0, 0, 0)},
+						0.18
+					)
+
+					card.Size = UDim2.new(1, 0, 0, 40)
+
+					task.delay(0.18, function()
+						if not open then
+							list.Visible = false
+						end
+					end)
+
+					if callback then
+						callback(option)
+					end
+				end)
+			end
+
+			button.MouseButton1Click:Connect(function()
+				open = not open
+
+				if open then
+					list.Visible = true
+					list.Size = UDim2.new(1, 0, 0, 0)
+
+					local height = math.min(
+						#(options or {}) * 28 + 8,
+						125
+					)
+
+					play(
+						arrow,
+						{Rotation = 180},
+						0.16
+					)
+
+					play(
+						list,
+						{Size = UDim2.new(1, 0, 0, height)},
+						0.2
+					)
+
+					card.Size = UDim2.new(
+						1,
+						0,
+						0,
+						40 + height + 5
+					)
+				else
+					play(
+						arrow,
+						{Rotation = 0},
+						0.16
+					)
+
+					play(
+						list,
+						{Size = UDim2.new(1, 0, 0, 0)},
+						0.18
+					)
+
+					card.Size = UDim2.new(1, 0, 0, 40)
+
+					task.delay(0.18, function()
+						if not open then
+							list.Visible = false
+						end
+					end)
+				end
+			end)
+
+			return card
+		end
+
+		function tab:AddSearch(value, items, callback)
+			local card = makeCard(40)
+
+			local input = Instance.new("TextBox")
+			input.Size = UDim2.new(1, -14, 0, 27)
+			input.Position = UDim2.fromOffset(7, 6)
+			input.BackgroundColor3 = theme.Panel
+			input.Text = ""
+			input.PlaceholderText = value or "Search"
+			input.TextColor3 = theme.Text
+			input.PlaceholderColor3 = theme.Muted
+			input.TextSize = 10
+			input.Font = Enum.Font.Gotham
+			input.ClearTextOnFocus = false
+			input.Parent = card
+
+			makeCorner(input, 6)
+
+			input:GetPropertyChangedSignal("Text"):Connect(function()
+				local query = string.lower(input.Text)
+
+				for _, item in ipairs(items or {}) do
+					local itemText = string.lower(tostring(item))
+
+					if string.find(itemText, query, 1, true) then
+						if callback then
+							callback(item)
+						end
+					end
+				end
+			end)
+
+			return input
+		end
+
+		return tab
+	end
+
+	function api:SetTheme(name)
+		if not THEMES[name] then
+			return false
+		end
+
+		themeName = name
+		theme = THEMES[name]
+		updateTheme()
+
+		return true
+	end
+
+	function api:GetTheme()
+		return themeName
+	end
+
+	function api:GetIcons()
+		return table.clone(ICONS)
+	end
+
+	function api:Hide()
+		if destroyed or hidden then
+			return
+		end
+
+		hidden = true
+
+		for _, dot in ipairs(dragDots) do
+			play(
+				dot,
+				{BackgroundColor3 = theme.Muted},
+				0.12
+			)
+		end
+
+		play(
+			window,
+			{
+				Position = UDim2.new(
+					0.5,
+					0,
+					1.15,
+					0
+				),
+				Size = UDim2.fromOffset(
+					windowWidth - 30,
+					windowHeight - 25
+				)
+			},
+			0.32,
+			Enum.EasingStyle.Quint,
+			Enum.EasingDirection.In
+		)
+
+		task.delay(0.22, function()
+			if destroyed then
+				return
+			end
+
+			dock.Visible = true
+			dock.Position = UDim2.new(0.5, 0, 1, 15)
+			dock.BackgroundTransparency = 1
+			dockText.TextTransparency = 1
+			dockDot.BackgroundTransparency = 1
+			dockIcon.ImageTransparency = 1
+
+			play(
+				dock,
+				{
+					Position = UDim2.new(0.5, 0, 1, -18),
+					BackgroundTransparency = 0
+				},
+				0.28
+			)
+
+			play(
+				dockText,
+				{TextTransparency = 0},
+				0.25
+			)
+
+			play(
+				dockDot,
+				{BackgroundTransparency = 0},
+				0.25
+			)
+
+			play(
+				dockIcon,
+				{ImageTransparency = 0},
+				0.25
+			)
+
+			window.Visible = false
+		end)
+	end
+
+	function api:Show()
+		if destroyed or not hidden then
+			return
+		end
+
+		hidden = false
+		window.Visible = true
+		window.Position = UDim2.new(0.5, 0, 1.15, 0)
+
+		play(
+			dock,
+			{
+				Position = UDim2.new(0.5, 0, 1, 15),
+				BackgroundTransparency = 1
+			},
+			0.2
+		)
+
+		play(
+			dockText,
+			{TextTransparency = 1},
+			0.16
+		)
+
+		play(
+			dockDot,
+			{BackgroundTransparency = 1},
+			0.16
+		)
+
+		play(
+			dockIcon,
+			{ImageTransparency = 1},
+			0.16
+		)
+
+		task.delay(0.16, function()
+			if dock then
+				dock.Visible = false
+			end
+		end)
+
+		play(
+			window,
+			{
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(windowWidth, windowHeight)
+			},
+			0.35,
+			Enum.EasingStyle.Quint,
+			Enum.EasingDirection.Out
+		)
+	end
+
+	function api:Toggle()
+		if hidden then
+			self:Show()
+		else
+			self:Hide()
+		end
+	end
+
+	function api:SetCollapsed(value)
+		if value == true then
+			body.Visible = false
+
+			play(
+				window,
+				{
+					Size = UDim2.fromOffset(windowWidth, 48)
+				},
+				0.23
+			)
+		else
+			play(
+				window,
+				{
+					Size = UDim2.fromOffset(windowWidth, windowHeight)
+				},
+				0.23
+			)
+
+			task.delay(0.18, function()
+				if not destroyed then
+					body.Visible = true
+				end
+			end)
+		end
+	end
+
+	function api:IsMobile()
+		return mobile
+	end
+
+	function api:Destroy()
+		if destroyed then
+			return
+		end
+
+		destroyed = true
+
+		play(
+			window,
+			{
+				Position = UDim2.new(0.5, 0, 1.2, 0),
+				BackgroundTransparency = 1
+			},
+			0.25
+		)
+
+		task.delay(0.25, function()
+			if gui then
+				gui:Destroy()
+			end
+		end)
+	end
+
+	dock.MouseEnter:Connect(function()
+		play(
+			dock,
+			{BackgroundColor3 = theme.Hover},
+			0.15
+		)
+
+		play(
+			dockDot,
+			{
+				Size = UDim2.fromOffset(11, 11),
+				Position = UDim2.new(0, 12, 0.5, -5)
+			},
+			0.15
+		)
+
+		play(
+			dockIcon,
+			{ImageColor3 = theme.Text},
+			0.15
+		)
+	end)
+
+	dock.MouseLeave:Connect(function()
+		play(
+			dock,
+			{BackgroundColor3 = theme.Header},
+			0.15
+		)
+
+		play(
+			dockDot,
+			{
+				Size = UDim2.fromOffset(8, 8),
+				Position = UDim2.new(0, 14, 0.5, -4)
+			},
+			0.15
+		)
+
+		play(
+			dockIcon,
+			{ImageColor3 = theme.Muted},
+			0.15
+		)
+	end)
+
+	dock.MouseButton1Click:Connect(function()
+		api:Show()
+	end)
+
+	minimize.MouseButton1Click:Connect(function()
+		api:Hide()
+	end)
+
+	close.MouseButton1Click:Connect(function()
+		api:Destroy()
+	end)
+
+	updateResponsive()
+	updateTheme()
+
+	if config.Hidden then
+		api:Hide()
+	end
+
+	return api
+end
+
+CompactUI.Icons = table.clone(ICONS)
+CompactUI.Themes = table.clone(THEMES)
+
+return CompactUI
